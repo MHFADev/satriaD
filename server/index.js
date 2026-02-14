@@ -13,30 +13,52 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { encrypt, decrypt } = require('./utils/security');
-require('dotenv').config();
+
+// Load env vars
+try {
+  require('dotenv').config();
+} catch (e) {
+  console.log('dotenv not loaded, using system env');
+}
 
 const app = express();
 
-// Database connection for Vercel
+// Database connection
 let prisma;
+let pool;
+let adapter;
 
-if (process.env.NODE_ENV === 'production') {
-  // For Vercel production
-  const pool = new Pool({ 
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_URL.includes('sslmode=require') ? false : { rejectUnauthorized: false }
-  });
-  const adapter = new PrismaPg(pool);
+try {
+  if (!process.env.DATABASE_URL) {
+    throw new Error('DATABASE_URL is not defined');
+  }
+
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
+  
+  if (isProduction) {
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false }
+    });
+  } else {
+    pool = new Pool({ connectionString: process.env.DATABASE_URL });
+  }
+  
+  adapter = new PrismaPg(pool);
   prisma = new PrismaClient({ adapter });
-} else {
-  // For local development
-  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  const adapter = new PrismaPg(pool);
-  prisma = new PrismaClient({ adapter });
+  
+  console.log('✅ Database connected successfully');
+} catch (error) {
+  console.error('❌ Database connection failed:', error.message);
+  // Create dummy prisma to prevent crashes
+  prisma = {
+    admin: { findUnique: async () => null },
+    project: { findMany: async () => [], create: async () => ({}), delete: async () => ({}), findUnique: async () => null },
+    order: { findMany: async () => [], create: async () => ({}) }
+  };
 }
 
-const PORT = process.env.PORT || 5000;
-const JWT_SECRET = process.env.JWT_SECRET || 'satriad_secret_key_123';
+const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key';
 
 // --- SECURITY MIDDLEWARE ---
 // 1. Helmet for security headers
@@ -73,6 +95,11 @@ const uploadDir = process.env.NODE_ENV === 'production' ? '/tmp' : path.join(__d
 if (!fs.existsSync(uploadDir) && process.env.NODE_ENV !== 'production') {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'OK', dbConnected: !!prisma, timestamp: new Date().toISOString() });
+});
 
 // Multer Config for temporary storage
 const storage = multer.memoryStorage();

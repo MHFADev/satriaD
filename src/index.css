@@ -1,0 +1,19 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply antialiased;
+  }
+}
+
+@layer components {
+  .neo-brutal-btn {
+    @apply px-6 py-3 border-3 border-black shadow-brutal transition-all duration-200 active:translate-x-[2px] active:translate-y-[2px] active:shadow-none hover:-translate-x-[2px] hover:-translate-y-[2px] hover:shadow-brutal-lg font-bold;
+  }
+  
+  .neo-brutal-card {
+    @apply bg-white border-3 border-black shadow-brutal-lg p-6;
+  }
+}

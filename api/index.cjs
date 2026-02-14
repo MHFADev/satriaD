@@ -1,27 +1,30 @@
+const express = require('express');
+const cors = require('cors');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { Pool } = require('pg');
+const serverless = require('serverless-http');
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const JWT_SECRET = process.env.JWT_SECRET || 'satriad_jwt_secret_fallback_2026';
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || 'satriastudio12_secret_key_32chars_';
 
-console.log('DATABASE_URL exists:', !!DATABASE_URL);
+// Setup Prisma
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
-let prisma;
-try {
-  const pool = new Pool({
-    connectionString: DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-  });
-  const adapter = new PrismaPg(pool);
-  prisma = new PrismaClient({ adapter });
-} catch (err) {
-  console.error('Prisma init error:', err);
-}
+// Express app
+const app = express();
+app.use(cors());
+app.use(express.json());
 
+// Decrypt function
 function decrypt(text) {
   if (!text) return text;
   try {
@@ -38,71 +41,61 @@ function decrypt(text) {
   }
 }
 
-module.exports = async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'authorization, content-type');
-
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
-
-  const url = req.url;
-  console.log('Request:', req.method, url);
-
+// Auth middleware
+const auth = (req, res, next) => {
+  const token = req.headers['authorization'];
+  if (!token) return res.status(401).json({ message: 'No token, authorization denied' });
   try {
-    // POST /api/admin/login
-    if (url === '/api/admin/login' && req.method === 'POST') {
-      const { username, password } = req.body;
-      
-      if (!prisma) {
-        return res.status(500).json({ message: 'Database not initialized', debug: { dbUrlExists: !!DATABASE_URL } });
-      }
-      
-      const admin = await prisma.admin.findUnique({ where: { username } });
-      if (!admin) {
-        return res.status(401).json({ message: 'Invalid credentials' });
-      }
-
-      const isMatch = await bcrypt.compare(password, admin.password);
-      if (!isMatch) {
-        return res.status(401).json({ message: 'Invalid credentials' });
-      }
-
-      const token = jwt.sign({ id: admin.id, username: admin.username }, JWT_SECRET, { expiresIn: '1d' });
-      return res.json({ success: true, token });
-    }
-
-    // GET /api/projects
-    if (url === '/api/projects' && req.method === 'GET') {
-      const projects = await prisma.project.findMany({ orderBy: { createdAt: 'desc' } });
-      return res.json(projects);
-    }
-
-    // GET /api/orders
-    if (url === '/api/orders' && req.method === 'GET') {
-      const token = req.headers['authorization'];
-      if (!token) {
-        return res.status(401).json({ message: 'No token, authorization denied' });
-      }
-
-      const decoded = jwt.verify(token.split(' ')[1], JWT_SECRET);
-      
-      const orders = await prisma.order.findMany({ orderBy: { createdAt: 'desc' } });
-      const decrypted = orders.map(order => ({
-        ...order,
-        name: decrypt(order.name),
-        whatsapp: decrypt(order.whatsapp),
-        detail: decrypt(order.detail)
-      }));
-      return res.json(decrypted);
-    }
-
-    // 404 for other routes
-    res.status(404).json({ message: 'Not found', url, method: req.method });
-  } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ message: 'Server error', error: error.message });
+    const decoded = jwt.verify(token.split(' ')[1], JWT_SECRET);
+    req.admin = decoded;
+    next();
+  } catch (err) {
+    res.status(401).json({ message: 'Token is not valid' });
   }
 };
+
+// Routes
+app.post('/api/admin/login', async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const admin = await prisma.admin.findUnique({ where: { username } });
+    if (!admin) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+    const isMatch = await bcrypt.compare(password, admin.password);
+    if (!isMatch) {
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+    const token = jwt.sign({ id: admin.id, username: admin.username }, JWT_SECRET, { expiresIn: '1d' });
+    res.json({ success: true, token });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
+app.get('/api/projects', async (req, res) => {
+  try {
+    const projects = await prisma.project.findMany({ orderBy: { createdAt: 'desc' } });
+    res.json(projects);
+  } catch (error) {
+    res.status(500).json({ message: 'Gagal mengambil data project.' });
+  }
+});
+
+app.get('/api/orders', auth, async (req, res) => {
+  try {
+    const orders = await prisma.order.findMany({ orderBy: { createdAt: 'desc' } });
+    const decrypted = orders.map(order => ({
+      ...order,
+      name: decrypt(order.name),
+      whatsapp: decrypt(order.whatsapp),
+      detail: decrypt(order.detail)
+    }));
+    res.json(decrypted);
+  } catch (error) {
+    res.status(500).json({ message: 'Gagal mengambil data pesanan.' });
+  }
+});
+
+module.exports = serverless(app);

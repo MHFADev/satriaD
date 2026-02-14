@@ -248,9 +248,12 @@ app.get('/api/orders', auth, async (req, res) => {
 });
 
 // --- SERVER START ---
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+// Only start server if running directly (not on Vercel)
+if (process.env.VERCEL !== '1') {
+  app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
 
 // Export for Vercel serverless
 module.exports = app;

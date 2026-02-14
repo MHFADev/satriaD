@@ -161,16 +161,17 @@ app.post('/api/projects', auth, upload.single('image'), async (req, res) => {
     const filename = `project-${Date.now()}.webp`;
     const filepath = path.join(uploadDir, filename);
 
-    // Image Compression & WebP Conversion
-    await sharp(req.file.buffer)
-      .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
-      .webp({ quality: 80 })
-      .toFile(filepath);
-
     // For Vercel, we'll return base64 or use a CDN
-    const imageUrl = process.env.NODE_ENV === 'production' 
-      ? `data:image/webp;base64,${req.file.buffer.toString('base64')}`
-      : `/uploads/${filename}`;
+    let imageUrl;
+    if (process.env.VERCEL === '1') {
+      imageUrl = `data:image/webp;base64,${req.file.buffer.toString('base64')}`;
+    } else {
+      imageUrl = `/uploads/${filename}`;
+      await sharp(req.file.buffer)
+        .resize(1200, 1200, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 80 })
+        .toFile(filepath);
+    }
 
     const project = await p.project.create({
       data: {

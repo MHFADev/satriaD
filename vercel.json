@@ -1,7 +1,7 @@
 {
   "version": 2,
   "framework": "vite",
-  "installCommand": "npm install && cd server && npm install && npx prisma generate",
+  "installCommand": "npm install && cd server && npm install && npx prisma generate && node seed.js",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "routes": [

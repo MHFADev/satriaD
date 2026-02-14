@@ -3,7 +3,6 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const xss = require('xss-clean');
-const { PrismaClient } = require('@prisma/client');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { Pool } = require('pg');
 const multer = require('multer');
@@ -19,6 +18,19 @@ try {
   require('dotenv').config();
 } catch (e) {
   console.log('dotenv not loaded, using system env');
+}
+
+// Import PrismaClient - try multiple paths for compatibility
+let PrismaClient;
+try {
+  ({ PrismaClient } = require('@prisma/client'));
+} catch (e) {
+  try {
+    ({ PrismaClient } = require('./node_modules/@prisma/client'));
+  } catch (e2) {
+    console.error('Cannot load PrismaClient:', e.message);
+    throw e;
+  }
 }
 
 const app = express();

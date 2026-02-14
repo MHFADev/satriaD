@@ -4,21 +4,18 @@
   "installCommand": "npm install && cd server && npm install && npx prisma generate && node seed.js",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "/api/index.cjs"
+      "source": "/api/(.*)",
+      "destination": "/api/index.cjs"
     },
     {
-      "src": "/uploads/(.*)",
-      "dest": "/api/index.cjs"
+      "source": "/uploads/(.*)",
+      "destination": "/api/index.cjs"
     },
     {
-      "handle": "filesystem"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
   ],
   "env": {

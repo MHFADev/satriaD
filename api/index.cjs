@@ -5,8 +5,7 @@ const jwt = require('jsonwebtoken');
 const { PrismaClient } = require('@prisma/client');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { Pool } = require('pg');
-const multer = require('multer');
-const crypto = require('crypto');
+const serverless = require('serverless-http');
 
 // Environment variables
 const DATABASE_URL = process.env.DATABASE_URL;
@@ -113,5 +112,5 @@ app.get('/orders', auth, async (req, res) => {
   }
 });
 
-// Export for Vercel
-module.exports = app;
+// Export for Vercel using serverless-http
+module.exports = serverless(app);

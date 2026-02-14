@@ -66,8 +66,13 @@ if (!fs.existsSync(uploadDir) && process.env.NODE_ENV !== 'production') {
 }
 
 // Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'OK', dbConnected: !!prisma, timestamp: new Date().toISOString() });
+app.get('/api/health', async (req, res) => {
+  try {
+    const adminCount = await prisma.admin.count();
+    res.json({ status: 'OK', dbConnected: !!prisma, adminCount, timestamp: new Date().toISOString() });
+  } catch (error) {
+    res.json({ status: 'Error', dbConnected: false, error: error.message, timestamp: new Date().toISOString() });
+  }
 });
 
 // Multer Config for temporary storage
@@ -81,17 +86,23 @@ app.post('/api/admin/login', async (req, res) => {
   const { username, password } = req.body;
   console.log('Login attempt:', { username, password });
   try {
+    // First check if any admin exists
+    const adminCount = await prisma.admin.count();
+    console.log('Total admin count:', adminCount);
+    
     const admin = await prisma.admin.findUnique({ where: { username } });
     console.log('Admin found:', admin);
     if (!admin) {
-      console.log('Admin not found');
-      return res.status(401).json({ message: 'Invalid credentials' });
+      console.log('Admin not found for username:', username);
+      return res.status(401).json({ message: 'Invalid credentials', debug: { adminCount } });
     }
 
     console.log('Comparing password...');
+    console.log('Input password:', password);
+    console.log('Stored hash:', admin.password);
     const isMatch = await bcrypt.compare(password, admin.password);
     console.log('Password match:', isMatch);
-    if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
+    if (!isMatch) return res.status(401).json({ message: 'Invalid credentials', debug: { passwordMatch: false } });
 
     const token = jwt.sign({ id: admin.id, username: admin.username }, JWT_SECRET, { expiresIn: '1d' });
     res.json({ success: true, token });

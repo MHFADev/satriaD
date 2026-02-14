@@ -83,17 +83,25 @@ const upload = multer({ storage: storage });
 // Admin Login
 app.post('/api/admin/login', async (req, res) => {
   const { username, password } = req.body;
+  console.log('Login attempt:', { username, password });
   try {
     const admin = await prisma.admin.findUnique({ where: { username } });
-    if (!admin) return res.status(401).json({ message: 'Invalid credentials' });
+    console.log('Admin found:', admin);
+    if (!admin) {
+      console.log('Admin not found');
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
 
+    console.log('Comparing password...');
     const isMatch = await bcrypt.compare(password, admin.password);
+    console.log('Password match:', isMatch);
     if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
 
     const token = jwt.sign({ id: admin.id, username: admin.username }, JWT_SECRET, { expiresIn: '1d' });
     res.json({ success: true, token });
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    console.error('Login error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 });
 

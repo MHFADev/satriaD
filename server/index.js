@@ -21,13 +21,30 @@ const PORT = process.env.PORT || 5000;
 
 const app = express();
 
-// Database connection
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+// Database connection (lazy + crash-safe for serverless)
+let prisma;
+let prismaInitError;
+function getPrisma() {
+  if (prisma) return prisma;
+  if (prismaInitError) throw prismaInitError;
+
+  try {
+    if (!process.env.DATABASE_URL) {
+      throw new Error('DATABASE_URL is not defined');
+    }
+
+    const pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
+    const adapter = new PrismaPg(pool);
+    prisma = new PrismaClient({ adapter });
+    return prisma;
+  } catch (err) {
+    prismaInitError = err;
+    throw err;
+  }
+}
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key';
 
@@ -61,10 +78,11 @@ if (!fs.existsSync(uploadDir) && process.env.NODE_ENV !== 'production') {
 // Health check endpoint
 app.get('/api/health', async (req, res) => {
   try {
-    const adminCount = await prisma.admin.count();
-    res.json({ status: 'OK', dbConnected: !!prisma, adminCount, timestamp: new Date().toISOString() });
+    const p = getPrisma();
+    const adminCount = await p.admin.count();
+    res.json({ status: 'OK', dbConnected: true, adminCount, timestamp: new Date().toISOString() });
   } catch (error) {
-    res.json({ status: 'Error', dbConnected: false, error: error.message, timestamp: new Date().toISOString() });
+    res.status(500).json({ status: 'Error', dbConnected: false, error: error.message, timestamp: new Date().toISOString() });
   }
 });
 
@@ -79,11 +97,12 @@ app.post('/api/admin/login', async (req, res) => {
   const { username, password } = req.body;
   console.log('Login attempt:', { username, password });
   try {
+    const p = getPrisma();
     // First check if any admin exists
-    const adminCount = await prisma.admin.count();
+    const adminCount = await p.admin.count();
     console.log('Total admin count:', adminCount);
     
-    const admin = await prisma.admin.findUnique({ where: { username } });
+    const admin = await p.admin.findUnique({ where: { username } });
     console.log('Admin found:', admin);
     if (!admin) {
       console.log('Admin not found for username:', username);
@@ -124,7 +143,8 @@ const auth = (req, res, next) => {
 // Get All Projects
 app.get('/api/projects', async (req, res) => {
   try {
-    const projects = await prisma.project.findMany({ orderBy: { createdAt: 'desc' } });
+    const p = getPrisma();
+    const projects = await p.project.findMany({ orderBy: { createdAt: 'desc' } });
     res.json(projects);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching projects' });
@@ -137,6 +157,7 @@ app.post('/api/projects', auth, upload.single('image'), async (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'Image is required' });
 
   try {
+    const p = getPrisma();
     const filename = `project-${Date.now()}.webp`;
     const filepath = path.join(uploadDir, filename);
 
@@ -151,7 +172,7 @@ app.post('/api/projects', auth, upload.single('image'), async (req, res) => {
       ? `data:image/webp;base64,${req.file.buffer.toString('base64')}`
       : `/uploads/${filename}`;
 
-    const project = await prisma.project.create({
+    const project = await p.project.create({
       data: {
         title,
         category,
@@ -171,7 +192,8 @@ app.post('/api/projects', auth, upload.single('image'), async (req, res) => {
 app.delete('/api/projects/:id', auth, async (req, res) => {
   const { id } = req.params;
   try {
-    const project = await prisma.project.findUnique({ where: { id: parseInt(id) } });
+    const p = getPrisma();
+    const project = await p.project.findUnique({ where: { id: parseInt(id) } });
     if (!project) return res.status(404).json({ message: 'Project not found' });
 
     // Remove file (only for local development)
@@ -180,7 +202,7 @@ app.delete('/api/projects/:id', auth, async (req, res) => {
       if (fs.existsSync(filepath)) fs.unlinkSync(filepath);
     }
 
-    await prisma.project.delete({ where: { id: parseInt(id) } });
+    await p.project.delete({ where: { id: parseInt(id) } });
     res.json({ success: true, message: 'Project deleted' });
   } catch (error) {
     res.status(500).json({ message: 'Error deleting project' });
@@ -192,7 +214,8 @@ app.delete('/api/projects/:id', auth, async (req, res) => {
 app.post('/api/orders', async (req, res) => {
   const { name, whatsapp, service, deadline, detail } = req.body;
   try {
-    const newOrder = await prisma.order.create({
+    const p = getPrisma();
+    const newOrder = await p.order.create({
       data: {
         name: encrypt(name),
         whatsapp: encrypt(whatsapp),
@@ -210,7 +233,8 @@ app.post('/api/orders', async (req, res) => {
 
 app.get('/api/orders', auth, async (req, res) => {
   try {
-    const orders = await prisma.order.findMany({ orderBy: { createdAt: 'desc' } });
+    const p = getPrisma();
+    const orders = await p.order.findMany({ orderBy: { createdAt: 'desc' } });
     const decryptedOrders = orders.map(order => ({
       ...order,
       name: decrypt(order.name),

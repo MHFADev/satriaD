@@ -1,15 +1,9 @@
 const { PrismaClient } = require('@prisma/client');
-const { PrismaPg } = require('@prisma/adapter-pg');
-const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
-require('dotenv').config({ path: '../.env.local' });
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env.local') });
 
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
-const adapter = new PrismaPg(pool);
-const prisma = new PrismaClient({ adapter });
+const prisma = new PrismaClient();
 
 async function main() {
   console.log('Starting seed...');
@@ -39,10 +33,7 @@ async function main() {
       },
     });
 
-    console.log('✅ Admin 1 created/updated:');
-    console.log(`Username: ${admin1.username}`);
-    console.log(`ID: ${admin1.id}`);
-    console.log('Password: Satria@12 (hashed)');
+    console.log('✅ Admin 1 created/updated:', admin1.username);
     
     // Admin 2
     const username2 = 'satria12';
@@ -61,16 +52,17 @@ async function main() {
       },
     });
 
-    console.log('✅ Admin 2 created/updated:');
-    console.log(`Username: ${admin2.username}`);
-    console.log(`ID: ${admin2.id}`);
-    console.log('Password: satria09 (hashed)');
+    console.log('✅ Admin 2 created/updated:', admin2.username);
     
   } catch (error) {
     console.error('❌ Seed error:', error);
-    throw error;
+    process.exit(1);
+  } finally {
+    await prisma.$disconnect();
   }
 }
+
+main();
 
 main()
   .catch((e) => {

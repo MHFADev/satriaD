@@ -16,7 +16,7 @@ async function main() {
   console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
   
   const username = 'satriaD';
-  const password = 'gag';
+  const password = 'Satria@12';
   
   console.log('Creating/updating admin:', username);
   
@@ -36,7 +36,7 @@ async function main() {
     console.log('✅ Admin account created/updated:');
     console.log(`Username: ${admin.username}`);
     console.log(`ID: ${admin.id}`);
-    console.log('Password: Satria@studio12 (hashed)');
+    console.log('Password: Satria@12 (hashed)');
   } catch (error) {
     console.error('❌ Seed error:', error);
     throw error;

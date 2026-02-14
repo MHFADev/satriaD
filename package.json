@@ -5,9 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "cd server && npm ci && npx prisma generate && cd .. && vite build",
-    "preview": "vite preview",
-    "postinstall": "cd server && npm install && npx prisma generate"
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@emailjs/browser": "^3.11.0",

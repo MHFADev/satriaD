@@ -1,15 +1,8 @@
+const { PrismaClient } = require('@prisma/client');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 require('dotenv').config();
-
-// Import PrismaClient with fallback
-let PrismaClient;
-try {
-  ({ PrismaClient } = require('@prisma/client'));
-} catch (e) {
-  ({ PrismaClient } = require('./node_modules/@prisma/client'));
-}
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

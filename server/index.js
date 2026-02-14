@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const xss = require('xss-clean');
+const { PrismaClient } = require('@prisma/client');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { Pool } = require('pg');
 const multer = require('multer');
@@ -14,61 +15,17 @@ const jwt = require('jsonwebtoken');
 const { encrypt, decrypt } = require('./utils/security');
 
 // Load env vars
-try {
-  require('dotenv').config();
-} catch (e) {
-  console.log('dotenv not loaded, using system env');
-}
-
-// Import PrismaClient - try multiple paths for compatibility
-let PrismaClient;
-try {
-  ({ PrismaClient } = require('@prisma/client'));
-} catch (e) {
-  try {
-    ({ PrismaClient } = require('./node_modules/@prisma/client'));
-  } catch (e2) {
-    console.error('Cannot load PrismaClient:', e.message);
-    throw e;
-  }
-}
+require('dotenv').config();
 
 const app = express();
 
 // Database connection
-let prisma;
-let pool;
-let adapter;
-
-try {
-  if (!process.env.DATABASE_URL) {
-    throw new Error('DATABASE_URL is not defined');
-  }
-
-  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL;
-  
-  if (isProduction) {
-    pool = new Pool({
-      connectionString: process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false }
-    });
-  } else {
-    pool = new Pool({ connectionString: process.env.DATABASE_URL });
-  }
-  
-  adapter = new PrismaPg(pool);
-  prisma = new PrismaClient({ adapter });
-  
-  console.log('✅ Database connected successfully');
-} catch (error) {
-  console.error('❌ Database connection failed:', error.message);
-  // Create dummy prisma to prevent crashes
-  prisma = {
-    admin: { findUnique: async () => null },
-    project: { findMany: async () => [], create: async () => ({}), delete: async () => ({}), findUnique: async () => null },
-    order: { findMany: async () => [], create: async () => ({}) }
-  };
-}
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 
 const JWT_SECRET = process.env.JWT_SECRET || 'fallback_secret_key';
 

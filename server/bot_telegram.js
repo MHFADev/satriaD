@@ -3,7 +3,7 @@ const axios = require('axios');
 const FormData = require('form-data');
 const fs = require('fs');
 const path = require('path');
-require('dotenv').config({ path: './.env.local' });
+require('dotenv').config({ path: path.join(__dirname, '../.env.local') });
 
 // --- CONFIGURATION ---
 const TELEGRAM_TOKEN = process.env.TELEGRAM_TOKEN;
@@ -11,6 +11,15 @@ const API_URL = process.env.API_URL || 'http://localhost:5000/api';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'satriaD';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Satria@12';
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID; // Your Telegram user ID for security
+
+if (!TELEGRAM_TOKEN) {
+  throw new Error('TELEGRAM_TOKEN is missing. Set TELEGRAM_TOKEN in .env.local');
+}
+
+console.log('🤖 Telegram Bot Config Loaded');
+console.log('- API_URL:', API_URL);
+console.log('- ADMIN_CHAT_ID:', ADMIN_CHAT_ID ? 'SET' : 'NOT SET');
+console.log('- TELEGRAM_TOKEN:', `SET (len=${String(TELEGRAM_TOKEN).length})`);
 
 let authToken = null;
 let botStats = { uploads: 0, deletions: 0, lastLogin: null, ordersChecked: 0 };

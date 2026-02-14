@@ -8,6 +8,7 @@ import OrderForm from './components/OrderForm'
 import Footer from './components/Footer'
 import FloatingShapes from './components/FloatingShapes'
 import AdminPanel from './components/AdminPanel'
+import TelegramTools from './components/TelegramTools'
 
 const LandingPage = () => (
   <div className="font-brutal text-black selection:bg-brutal-pink selection:text-white">
@@ -27,6 +28,7 @@ function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/admin" element={<AdminPanel />} />
+        <Route path="/tools/telegram" element={<TelegramTools />} />
       </Routes>
     </Router>
   )

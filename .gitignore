@@ -4,7 +4,9 @@ server/node_modules
 
 # Environment variables
 .env
+.env.local
 server/.env
+server/.env.local
 
 # Build output
 dist

@@ -27,6 +27,20 @@ let botStats = { uploads: 0, deletions: 0, lastLogin: null, ordersChecked: 0 };
 // Initialize bot with polling
 const bot = new TelegramBot(TELEGRAM_TOKEN, { polling: true });
 
+const stateByChat = new Map();
+
+function setState(chatId, next) {
+  stateByChat.set(String(chatId), next);
+}
+
+function getState(chatId) {
+  return stateByChat.get(String(chatId));
+}
+
+function clearState(chatId) {
+  stateByChat.delete(String(chatId));
+}
+
 // --- UTILS ---
 async function loginToWeb() {
   try {
@@ -50,6 +64,177 @@ function isAuthorized(chatId) {
   return chatId.toString() === ADMIN_CHAT_ID.toString();
 }
 
+function dashboardInlineKeyboard() {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: '📤 Upload', callback_data: 'dash:upload' },
+          { text: '🧾 Template', callback_data: 'dash:template' }
+        ],
+        [
+          { text: '📋 Projects', callback_data: 'dash:projects:0' },
+          { text: '📧 Orders', callback_data: 'dash:orders:0' }
+        ],
+        [
+          { text: '📊 Stats', callback_data: 'dash:stats' },
+          { text: '🔄 Login', callback_data: 'dash:login' }
+        ],
+        [
+          { text: '❓ Help', callback_data: 'dash:help' }
+        ]
+      ]
+    }
+  };
+}
+
+function uploadCategoryInlineKeyboard() {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: 'Graphic Design', callback_data: 'up:cat:Graphic Design' },
+          { text: 'Logo Design', callback_data: 'up:cat:Logo Design' }
+        ],
+        [
+          { text: 'Branding', callback_data: 'up:cat:Branding' },
+          { text: 'UI/UX Design', callback_data: 'up:cat:UI/UX Design' }
+        ],
+        [
+          { text: 'Web Development', callback_data: 'up:cat:Web Development' },
+          { text: 'Other', callback_data: 'up:cat:Other' }
+        ],
+        [
+          { text: '❌ Cancel', callback_data: 'up:cancel' }
+        ]
+      ]
+    }
+  };
+}
+
+function uploadConfirmInlineKeyboard() {
+  return {
+    reply_markup: {
+      inline_keyboard: [
+        [
+          { text: '✅ Publish', callback_data: 'up:confirm' },
+          { text: '❌ Cancel', callback_data: 'up:cancel' }
+        ]
+      ]
+    }
+  };
+}
+
+function listPagerInlineKeyboard(kind, page, hasPrev, hasNext) {
+  const prev = { text: '⬅️ Prev', callback_data: `dash:${kind}:${Math.max(0, page - 1)}` };
+  const next = { text: 'Next ➡️', callback_data: `dash:${kind}:${page + 1}` };
+  const home = { text: '🏠 Dashboard', callback_data: 'dash:home' };
+  const row = [];
+  if (hasPrev) row.push(prev);
+  row.push(home);
+  if (hasNext) row.push(next);
+  return { reply_markup: { inline_keyboard: [row] } };
+}
+
+async function ensureLogin() {
+  if (authToken) return true;
+  return loginToWeb();
+}
+
+function renderUploadPreview(state) {
+  return `📋 *Review Project*
+
+*Title:* ${state.title}
+*Category:* ${state.category}
+*Description:* ${state.description || 'None'}
+
+Klik *Publish* untuk upload.`;
+}
+
+async function sendDashboard(chatId, extraText) {
+  const text = extraText
+    ? `${extraText}\n\nPilih menu di bawah:`
+    : 'Pilih menu di bawah:';
+  return bot.sendMessage(chatId, text, {
+    parse_mode: 'Markdown',
+    ...dashboardInlineKeyboard()
+  });
+}
+
+function templateText() {
+  return `🧾 *Template Caption Upload (paling gampang)*
+
+1) Kirim foto
+2) Isi caption dengan format ini:
+
+\`/upload Judul | Kategori | Deskripsi\`
+
+Contoh:
+\`/upload Logo Satria | Branding | Logo minimalis untuk klien A\``;
+}
+
+async function listProjects(chatId, page) {
+  const pageSize = 5;
+  const res = await axios.get(`${API_URL}/projects`);
+  const projects = Array.isArray(res.data) ? res.data : [];
+  const start = page * pageSize;
+  const slice = projects.slice(start, start + pageSize);
+
+  if (slice.length === 0) {
+    return bot.sendMessage(chatId, '📭 Tidak ada project di halaman ini.', {
+      ...listPagerInlineKeyboard('projects', page, page > 0, start < projects.length)
+    });
+  }
+
+  let text = '📋 *Projects*\n\n';
+  slice.forEach((p, idx) => {
+    text += `${start + idx + 1}. *${p.title}*\n   ID: \`${p.id}\` | ${p.category}\n\n`;
+  });
+
+  const hasPrev = page > 0;
+  const hasNext = start + pageSize < projects.length;
+  return bot.sendMessage(chatId, text, {
+    parse_mode: 'Markdown',
+    ...listPagerInlineKeyboard('projects', page, hasPrev, hasNext)
+  });
+}
+
+async function listOrders(chatId, page) {
+  const pageSize = 3;
+  const ok = await ensureLogin();
+  if (!ok) {
+    return bot.sendMessage(chatId, '❌ Login ke API gagal. Coba tekan tombol 🔄 Login di dashboard.', dashboardInlineKeyboard());
+  }
+
+  const res = await axios.get(`${API_URL}/orders`, {
+    headers: { Authorization: `Bearer ${authToken}` }
+  });
+  const orders = Array.isArray(res.data) ? res.data : [];
+  botStats.ordersChecked++;
+  const start = page * pageSize;
+  const slice = orders.slice(start, start + pageSize);
+
+  if (slice.length === 0) {
+    return bot.sendMessage(chatId, '📭 Tidak ada order di halaman ini.', {
+      ...listPagerInlineKeyboard('orders', page, page > 0, start < orders.length)
+    });
+  }
+
+  let text = '📧 *Orders*\n\n';
+  slice.forEach((o, idx) => {
+    const detail = (o.detail || '').toString();
+    const short = detail.length > 160 ? `${detail.slice(0, 160)}...` : detail;
+    text += `${start + idx + 1}. *#${o.id}* - ${o.service}\n   👤 ${o.name}\n   📱 ${o.whatsapp}\n   📅 ${o.deadline || 'N/A'}\n   📝 ${short}\n\n`;
+  });
+
+  const hasPrev = page > 0;
+  const hasNext = start + pageSize < orders.length;
+  return bot.sendMessage(chatId, text, {
+    parse_mode: 'Markdown',
+    ...listPagerInlineKeyboard('orders', page, hasPrev, hasNext)
+  });
+}
+
 // --- KEYBOARD MENUS ---
 const mainMenuKeyboard = {
   reply_markup: {
@@ -60,17 +245,6 @@ const mainMenuKeyboard = {
     ],
     resize_keyboard: true,
     one_time_keyboard: false
-  }
-};
-
-const uploadConfirmKeyboard = {
-  reply_markup: {
-    inline_keyboard: [
-      [
-        { text: '✅ Confirm Upload', callback_data: 'confirm_upload' },
-        { text: '❌ Cancel', callback_data: 'cancel_upload' }
-      ]
-    ]
   }
 };
 
@@ -106,6 +280,13 @@ _Bot is ready to manage your portfolio!_ 🚀
   });
 
   await loginToWeb();
+  await sendDashboard(chatId, '✅ Dashboard ready');
+});
+
+bot.onText(/\/(menu|dashboard)/, async (msg) => {
+  const chatId = msg.chat.id;
+  if (!isAuthorized(chatId)) return;
+  await sendDashboard(chatId);
 });
 
 // Help command
@@ -145,10 +326,28 @@ bot.onText(/\/upload/, async (msg) => {
   const chatId = msg.chat.id;
   if (!isAuthorized(chatId)) return;
 
+  const raw = (msg.text || '').replace('/upload', '').trim();
+  if (raw.includes('|')) {
+    const parts = raw.split('|').map(p => p.trim()).filter(Boolean);
+    const [title, category, description] = parts;
+    if (!title || !category) {
+      await bot.sendMessage(chatId, '❌ Format: /upload Judul | Kategori | Deskripsi', { parse_mode: 'Markdown' });
+      return bot.sendMessage(chatId, templateText(), { parse_mode: 'Markdown', ...dashboardInlineKeyboard() });
+    }
+    uploadState[chatId] = {
+      step: 'waiting_photo',
+      title,
+      category,
+      description: description || ''
+    };
+    return bot.sendMessage(chatId, '📸 Kirim fotonya sekarang untuk publish.', { parse_mode: 'Markdown' });
+  }
+
   uploadState[chatId] = { step: 'waiting_title' };
-  
-  bot.sendMessage(chatId, '📤 *Upload Project*\n\nStep 1/3: Send me the project title:', {
-    parse_mode: 'Markdown'
+  setState(chatId, { flow: 'upload' });
+  bot.sendMessage(chatId, '📤 *Upload Project*\n\nKirim judul project:', {
+    parse_mode: 'Markdown',
+    ...dashboardInlineKeyboard()
   });
 });
 
@@ -162,115 +361,27 @@ bot.on('message', async (msg) => {
   if (state.step === 'waiting_title' && msg.text && !msg.text.startsWith('/')) {
     state.title = msg.text;
     state.step = 'waiting_category';
-    
-    const categories = [
-      ['Graphic Design', 'Logo Design'],
-      ['Branding', 'UI/UX Design'],
-      ['Web Development', 'Other']
-    ];
-    
-    bot.sendMessage(chatId, 'Step 2/3: Select category:', {
-      reply_markup: {
-        keyboard: categories,
-        resize_keyboard: true,
-        one_time_keyboard: true
-      }
+    return bot.sendMessage(chatId, 'Pilih kategori:', {
+      parse_mode: 'Markdown',
+      ...uploadCategoryInlineKeyboard()
     });
   }
-  
-  else if (state.step === 'waiting_category' && msg.text && !msg.text.startsWith('/')) {
-    state.category = msg.text;
-    state.step = 'waiting_description';
-    
-    bot.sendMessage(chatId, 'Step 3/3: Send me the description (or type "skip"):', {
-      reply_markup: {
-        keyboard: [['Skip']],
-        resize_keyboard: true,
-        one_time_keyboard: true
-      }
-    });
-  }
-  
+
   else if (state.step === 'waiting_description' && msg.text && !msg.text.startsWith('/')) {
     state.description = msg.text === 'Skip' ? '' : msg.text;
     state.step = 'waiting_photo';
-    
-    bot.sendMessage(chatId, 'Great! Now send me the project image:', {
-      reply_markup: { remove_keyboard: true }
+    return bot.sendMessage(chatId, '📸 Kirim fotonya sekarang:', {
+      parse_mode: 'Markdown'
     });
   }
   
   else if (state.step === 'waiting_photo' && msg.photo) {
     const photo = msg.photo[msg.photo.length - 1]; // Get highest quality
     state.photo = photo;
-    
-    const confirmMessage = `
-📋 *Confirm Upload:*
-
-*Title:* ${state.title}
-*Category:* ${state.category}
-*Description:* ${state.description || 'None'}
-
-Send /confirm to upload or /cancel to abort.
-    `;
-    
-    bot.sendMessage(chatId, confirmMessage, { parse_mode: 'Markdown' });
-    bot.sendPhoto(chatId, photo.file_id, { caption: 'Preview' });
-  }
-});
-
-// Confirm upload
-bot.onText(/\/confirm/, async (msg) => {
-  const chatId = msg.chat.id;
-  if (!isAuthorized(chatId) || !uploadState[chatId]) return;
-
-  const state = uploadState[chatId];
-  const statusMsg = await bot.sendMessage(chatId, '⏳ Uploading to server...');
-
-  try {
-    if (!authToken) await loginToWeb();
-
-    // Get photo file
-    const fileLink = await bot.getFileLink(state.photo.file_id);
-    const response = await axios.get(fileLink, { responseType: 'arraybuffer' });
-
-    const formData = new FormData();
-    formData.append('title', state.title);
-    formData.append('category', state.category);
-    formData.append('description', state.description);
-    formData.append('image', Buffer.from(response.data), {
-      filename: 'project.jpg',
-      contentType: 'image/jpeg',
-    });
-
-    const res = await axios.post(`${API_URL}/projects`, formData, {
-      headers: {
-        ...formData.getHeaders(),
-        Authorization: `Bearer ${authToken}`,
-      },
-    });
-
-    botStats.uploads++;
-    
-    bot.deleteMessage(chatId, statusMsg.message_id);
-    bot.sendMessage(chatId, `
-✅ *Project Uploaded Successfully!*
-
-🆔 ID: \`${res.data.data.id}\`
-📌 Title: ${res.data.data.title}
-🏷️ Category: ${res.data.data.category}
-
-_View it on your website!_
-    `, { 
+    await bot.sendPhoto(chatId, photo.file_id, { caption: 'Preview' });
+    return bot.sendMessage(chatId, renderUploadPreview(state), {
       parse_mode: 'Markdown',
-      ...mainMenuKeyboard
-    });
-
-    delete uploadState[chatId];
-  } catch (err) {
-    bot.editMessageText(`❌ Upload failed: ${err.response?.data?.message || err.message}`, {
-      chat_id: chatId,
-      message_id: statusMsg.message_id
+      ...uploadConfirmInlineKeyboard()
     });
   }
 });
@@ -280,6 +391,7 @@ bot.onText(/\/cancel/, (msg) => {
   const chatId = msg.chat.id;
   if (uploadState[chatId]) {
     delete uploadState[chatId];
+    clearState(chatId);
     bot.sendMessage(chatId, '❌ Upload cancelled.', mainMenuKeyboard);
   }
 });
@@ -289,38 +401,10 @@ bot.onText(/\/list|📋 List Projects/, async (msg) => {
   const chatId = msg.chat.id;
   if (!isAuthorized(chatId)) return;
 
-  const statusMsg = await bot.sendMessage(chatId, '⏳ Fetching projects...');
-
   try {
-    const res = await axios.get(`${API_URL}/projects`);
-    const projects = res.data;
-
-    if (projects.length === 0) {
-      return bot.editMessageText('📭 No projects found.', {
-        chat_id: chatId,
-        message_id: statusMsg.message_id
-      });
-    }
-
-    let message = '📂 *Latest Projects*\n\n';
-    projects.slice(0, 10).forEach((p, idx) => {
-      message += `${idx + 1}. *ID: ${p.id}* - ${p.title}\n   🏷️ ${p.category}\n\n`;
-    });
-
-    if (projects.length > 10) {
-      message += `_...and ${projects.length - 10} more projects_`;
-    }
-
-    bot.deleteMessage(chatId, statusMsg.message_id);
-    bot.sendMessage(chatId, message, { 
-      parse_mode: 'Markdown',
-      ...mainMenuKeyboard
-    });
+    await listProjects(chatId, 0);
   } catch (err) {
-    bot.editMessageText('❌ Failed to fetch projects.', {
-      chat_id: chatId,
-      message_id: statusMsg.message_id
-    });
+    bot.sendMessage(chatId, '❌ Failed to fetch projects.', { ...dashboardInlineKeyboard() });
   }
 });
 
@@ -329,48 +413,10 @@ bot.onText(/\/orders|📧 View Orders/, async (msg) => {
   const chatId = msg.chat.id;
   if (!isAuthorized(chatId)) return;
 
-  const statusMsg = await bot.sendMessage(chatId, '⏳ Fetching orders...');
-
   try {
-    if (!authToken) await loginToWeb();
-    
-    const res = await axios.get(`${API_URL}/orders`, {
-      headers: { Authorization: `Bearer ${authToken}` }
-    });
-    const orders = res.data;
-
-    botStats.ordersChecked++;
-
-    if (orders.length === 0) {
-      return bot.editMessageText('📭 No orders found.', {
-        chat_id: chatId,
-        message_id: statusMsg.message_id
-      });
-    }
-
-    bot.deleteMessage(chatId, statusMsg.message_id);
-
-    // Send each order as a separate message for better readability
-    orders.slice(0, 5).forEach((order, idx) => {
-      const orderText = `
-📧 *Order #${order.id}*
-
-👤 *Name:* ${order.name}
-📱 *WhatsApp:* ${order.whatsapp}
-🛠️ *Service:* ${order.service}
-📅 *Deadline:* ${order.deadline || 'Not specified'}
-📝 *Detail:* ${order.detail.substring(0, 200)}${order.detail.length > 200 ? '...' : ''}
-      `;
-      
-      bot.sendMessage(chatId, orderText, { parse_mode: 'Markdown' });
-    });
-
-    bot.sendMessage(chatId, `_Showing ${Math.min(orders.length, 5)} of ${orders.length} orders_`, mainMenuKeyboard);
+    await listOrders(chatId, 0);
   } catch (err) {
-    bot.editMessageText(`❌ Failed: ${err.response?.data?.message || err.message}`, {
-      chat_id: chatId,
-      message_id: statusMsg.message_id
-    });
+    bot.sendMessage(chatId, `❌ Failed: ${err.response?.data?.message || err.message}`, dashboardInlineKeyboard());
   }
 });
 
@@ -449,9 +495,8 @@ bot.on('photo', async (msg) => {
   
   // If no caption, ignore or prompt
   if (!msg.caption) {
-    return bot.sendMessage(chatId, '📸 I see a photo! To upload, send it with caption:\nFormat: `/upload Title | Category | Description`\n\nOr use the /upload command for step-by-step.', {
-      parse_mode: 'Markdown'
-    });
+    await bot.sendMessage(chatId, templateText(), { parse_mode: 'Markdown' });
+    return sendDashboard(chatId, '📸 Kirim foto dengan caption template di atas, atau tekan Upload untuk wizard.');
   }
 
   // Parse caption: /upload Title | Category | Description

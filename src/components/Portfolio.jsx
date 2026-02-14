@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import axios from 'axios'
 
-const API_URL = 'http://localhost:5000/api'
+const API_URL = '/api'
 
 const Portfolio = () => {
   const [projects, setProjects] = useState([])
@@ -68,7 +68,7 @@ const Portfolio = () => {
                 {item.imageUrl ? (
                   <div className="flex-1 border-b-3 border-black overflow-hidden bg-white">
                     <img 
-                      src={`http://localhost:5000${item.imageUrl}`} 
+                      src={item.imageUrl.startsWith('data:') ? item.imageUrl : item.imageUrl} 
                       alt={item.title} 
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     />

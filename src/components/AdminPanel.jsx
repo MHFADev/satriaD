@@ -231,7 +231,7 @@ const AdminPanel = () => {
                 {projects.map(proj => (
                   <div key={proj.id} className="bg-white border-3 border-black p-4 shadow-brutal group relative">
                     <div className="aspect-video border-3 border-black mb-4 overflow-hidden">
-                      <img src={`${API_URL.replace('/api', '')}${proj.imageUrl}`} alt={proj.title} className="w-full h-full object-cover" />
+                      <img src={proj.imageUrl} alt={proj.title} className="w-full h-full object-cover" />
                     </div>
                     <h4 className="text-xl font-black uppercase">{proj.title}</h4>
                     <p className="text-sm font-bold text-gray-600 uppercase mb-4">{proj.category}</p>

@@ -15,28 +15,52 @@ async function main() {
   console.log('Starting seed...');
   console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
   
-  const username = 'satriaD';
-  const password = 'Satria@12';
+  // Admin 1
+  const username1 = 'satriaD';
+  const password1 = 'Satria@12';
   
-  console.log('Creating/updating admin:', username);
+  console.log('Creating/updating admin:', username1);
   
   try {
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword1 = await bcrypt.hash(password1, 10);
     console.log('Password hashed successfully');
 
-    const admin = await prisma.admin.upsert({
-      where: { username },
-      update: { password: hashedPassword },
+    const admin1 = await prisma.admin.upsert({
+      where: { username: username1 },
+      update: { password: hashedPassword1 },
       create: {
-        username,
-        password: hashedPassword,
+        username: username1,
+        password: hashedPassword1,
       },
     });
 
-    console.log('✅ Admin account created/updated:');
-    console.log(`Username: ${admin.username}`);
-    console.log(`ID: ${admin.id}`);
+    console.log('✅ Admin 1 created/updated:');
+    console.log(`Username: ${admin1.username}`);
+    console.log(`ID: ${admin1.id}`);
     console.log('Password: Satria@12 (hashed)');
+    
+    // Admin 2
+    const username2 = 'satria12';
+    const password2 = 'satria09';
+    
+    console.log('Creating/updating admin:', username2);
+    
+    const hashedPassword2 = await bcrypt.hash(password2, 10);
+    
+    const admin2 = await prisma.admin.upsert({
+      where: { username: username2 },
+      update: { password: hashedPassword2 },
+      create: {
+        username: username2,
+        password: hashedPassword2,
+      },
+    });
+
+    console.log('✅ Admin 2 created/updated:');
+    console.log(`Username: ${admin2.username}`);
+    console.log(`ID: ${admin2.id}`);
+    console.log('Password: satria09 (hashed)');
+    
   } catch (error) {
     console.error('❌ Seed error:', error);
     throw error;

@@ -2,7 +2,7 @@ const { PrismaClient } = require('@prisma/client');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
-require('dotenv').config();
+require('dotenv').config({ path: '../.env.local' });
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -14,6 +14,11 @@ const prisma = new PrismaClient({ adapter });
 async function main() {
   console.log('Starting seed...');
   console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+
+  if (!process.env.DATABASE_URL) {
+    console.warn('⚠️ DATABASE_URL not found. Skipping seed.');
+    return;
+  }
   
   // Admin 1
   const username1 = 'satriaD';

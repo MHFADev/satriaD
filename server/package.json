@@ -31,5 +31,8 @@
     "prisma": "^7.4.0",
     "sharp": "^0.34.5",
     "xss-clean": "^0.1.4"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }

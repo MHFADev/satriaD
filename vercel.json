@@ -1,17 +1,17 @@
 {
   "version": 2,
   "framework": "vite",
-  "installCommand": "npm install && cd server && npm install && npx prisma generate && node seed.js",
+  "installCommand": "npm install && cd server && npm install && npx prisma generate",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/index.cjs"
+      "destination": "/api/index.js"
     },
     {
       "source": "/uploads/(.*)",
-      "destination": "/api/index.cjs"
+      "destination": "/api/index.js"
     },
     {
       "source": "/(.*)",

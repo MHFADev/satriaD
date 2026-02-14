@@ -9,3 +9,40 @@ channel = "stable-25_05"
 
 [userenv.shared]
 NODE_ENV = "development"
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "App Server"
+
+[[workflows.workflow]]
+name = "App Server"
+author = "agent"
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run dev & (cd server && PORT=3001 npm start)"
+waitForPort = 5000
+
+[[ports]]
+localPort = 3001
+externalPort = 3001
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[deployment]
+deploymentTarget = "autoscale"
+run = ["bash", "-c", "cd server && npm start & npm run preview"]
+build = ["bash", "-c", "npm install && cd server && npm install && npx prisma generate && npm run build"]

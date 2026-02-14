@@ -1,21 +1,23 @@
 {
   "version": 2,
-  "framework": "vite",
-  "installCommand": "npm install && cd server && npm install && npx prisma generate",
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "rewrites": [
+  "builds": [
     {
-      "source": "/api/(.*)",
-      "destination": "/api/index.cjs"
+      "src": "api/index.cjs",
+      "use": "@vercel/node"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.cjs"
     },
     {
-      "source": "/uploads/(.*)",
-      "destination": "/api/index.cjs"
+      "src": "/uploads/(.*)",
+      "dest": "/api/index.cjs"
     },
     {
-      "source": "/(.*)",
-      "destination": "/index.html"
+      "src": "/(.*)",
+      "dest": "/index.html"
     }
   ],
   "env": {

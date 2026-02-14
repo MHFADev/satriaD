@@ -21,7 +21,7 @@ require('dotenv').config({ path: './.env.local' });
 
 // --- CONFIGURATION ---
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
-const CLIENT_ID = '1472245680952184887';
+const CLIENT_ID = '1472276854252503321';
 const API_URL = process.env.API_URL || 'http://localhost:5000/api';
 const ADMIN_USERNAME = process.env.ADMIN_USERNAME || 'satriaD';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'Satria@12';

@@ -1,4 +1,4 @@
-modules = ["nodejs-20", "web", "postgresql-16"]
+modules = ["nodejs-20", "bash", "web"]
 [agent]
 expertMode = true
 
@@ -31,7 +31,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev & (cd server && PORT=3001 npm start)"
+args = "cd /home/runner/workspace && npx concurrently \"npx vite --port 5000 --host 0.0.0.0\" \"cd server && PORT=3001 node index.js\""
 waitForPort = 5000
 
 [[ports]]

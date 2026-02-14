@@ -1,3 +1,4 @@
 const app = require('../server/index');
+const serverless = require('serverless-http');
 
-module.exports = app;
+module.exports = serverless(app);

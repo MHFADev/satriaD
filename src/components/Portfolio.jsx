@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import axios from 'axios'
 
-const API_URL = '/api'
+const API_URL = import.meta.env.VITE_API_URL || '/api'
 
 const Portfolio = () => {
   const [projects, setProjects] = useState([])

@@ -1,17 +1,17 @@
-const { PrismaClient } = require('@prisma/client');
-const { PrismaPg } = require('@prisma/adapter-pg');
-const pg = require('pg');
-const jwt = require('jsonwebtoken');
-const formidable = require('formidable');
-const fs = require('fs/promises');
-const sharp = require('sharp');
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import pg from 'pg';
+import jwt from 'jsonwebtoken';
+import formidable from 'formidable';
+import fs from 'fs/promises';
+import sharp from 'sharp';
 
 const { Pool } = pg;
 
 const DATABASE_URL = process.env.DATABASE_URL;
 const JWT_SECRET = process.env.JWT_SECRET || 'satriad_jwt_secret_fallback_2026';
 
-module.exports.config = {
+export const config = {
   api: {
     bodyParser: false,
   },
@@ -31,7 +31,7 @@ if (DATABASE_URL) {
   }
 }
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
